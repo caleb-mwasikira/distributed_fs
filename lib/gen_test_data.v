@@ -10,7 +10,7 @@ pub fn fill_file_with_random_data(fpath string, size u32) ! {
 	}
 
 	mut i_size := size
-	buf_size := 10 * u32(FileSize.kilobytes) // 10KB
+	buf_size := 10 * u32(ByteSize.kilobytes) // 10KB
 
 	for i_size != 0 {
 		n_bytes := match true {

@@ -1,9 +1,9 @@
 module lib
 
 import os
-import crypto.sha256
+import crypto.md5
 
-pub enum FileSize as u32 {
+pub enum ByteSize as u32 {
 	byte      = 8 // 1 byte -> 8 bits
 	kilobytes = 1024 // 1 kb -> 1024 bytes
 	megabytes = 1024 * 1024
@@ -16,14 +16,14 @@ pub fn hash_file(fpath string) !string {
 		file.close()
 	}
 
-	max_bufsize := 69 * int(FileSize.megabytes) // 60MB
+	max_bufsize := 69 * int(ByteSize.megabytes) // 60MB
 
 	// if file size is small enough,
 	// just load all the data into memory and compute the hash
 	fsize := os.file_size(fpath)
 	if fsize <= max_bufsize {
 		buffer := file.read_bytes(int(fsize))
-		return sha256.sum(buffer).hex()
+		return md5.sum(buffer).hex()
 	}
 
 	mut cur_pos := u64(0)
@@ -51,12 +51,12 @@ pub fn hash_file(fpath string) !string {
 		}
 	}
 
-	return sha256.sum(joint_hashes).hex()
+	return md5.sum(joint_hashes).hex()
 }
 
 fn hash_chunk(buffer []u8, cur_pos u64, shared hashes map[u64][]u8) {
-	println('hashing the next ${buffer.len / int(FileSize.megabytes)} MB of data...')
-	hash := sha256.sum(buffer)
+	println('hashing the next ${buffer.len / int(ByteSize.megabytes)} MB of data...')
+	hash := md5.sum(buffer)
 
 	lock {
 		hashes[cur_pos] = hash
