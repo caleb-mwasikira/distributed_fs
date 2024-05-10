@@ -1,7 +1,7 @@
 import os
 import flag
 import time
-import lib { hash_file }
+import lib { hash_file, chunk_file }
 
 struct Args {
 pub:
@@ -61,13 +61,15 @@ fn main() {
 		exit(1)
 	}
 
-	for _, fname in valid_fnames {
-		stop_watch := time.new_stopwatch()
+	mut stop_watch := time.new_stopwatch()
+	mut chunks := []lib.Chunk{}
 
-		hash := hash_file(fname) or {
-			eprintln('failed to get file hash ${err}')
-			continue
+	for fname in valid_fnames {
+		chunks = chunk_file(fname) or {
+			eprintln(err)
+			exit(1)
 		}
-		println('${hash}\t${fname}\t${stop_watch.elapsed().seconds()}')
+		elapsed_time := stop_watch.elapsed().seconds()
+		println('saved ${chunks.len} chunks to disk in ${elapsed_time} s')
 	}
 }
