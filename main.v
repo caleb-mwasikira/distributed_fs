@@ -1,7 +1,7 @@
 import os
 import flag
 import time
-import lib { hash_file, chunk_file }
+import lib { DfSfile, hash_file, chunk_file }
 
 struct Args {
 pub:
@@ -62,14 +62,15 @@ fn main() {
 	}
 
 	mut stop_watch := time.new_stopwatch()
-	mut chunks := []lib.Chunk{}
 
 	for fname in valid_fnames {
-		chunks = chunk_file(fname) or {
+		dfs_file := chunk_file(fname) or {
 			eprintln(err)
 			exit(1)
 		}
+		
 		elapsed_time := stop_watch.elapsed().seconds()
-		println('saved ${chunks.len} chunks to disk in ${elapsed_time} s')
+		println(dfs_file)
+		println("${elapsed_time} s")
 	}
 }

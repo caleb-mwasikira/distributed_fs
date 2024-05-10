@@ -1,21 +1,22 @@
 module lib
 
 import os
-import crypto.sha256
+import crypto.md5
 
-struct DFSFile {
-	filename      string
-	stat          os.Stat
-	chunks        []Chunk
-	chunk_servers []string
+pub struct DfSfile {
+pub:
+	filename      string   @[required]
+	chunks        []Chunk  @[required]
+	chunk_servers []string = []string{}
 }
 
 pub struct Chunk {
 pub:
 	cur_pos u64
+	bufsize u64
 pub mut:
-	fpath string
-	fhash string
+	fpath  string
+	md5sum string
 }
 
 pub fn (mut c Chunk) get_data() ![]u8 {
@@ -32,9 +33,8 @@ pub fn (mut c Chunk) get_data() ![]u8 {
 }
 
 // partitions large files into small chunks,
-// saves each chunk to disk as a file and returns a list of chunks
-// saved to disk.
-pub fn chunk_file(fpath string) ![]Chunk {
+// saves each chunk to disk as a file and returns a DfSfile struct
+pub fn chunk_file(fpath string) !DfSfile {
 	mut file := os.open_file(fpath, 'rb', 0o666)!
 	defer {
 		file.close()
@@ -67,14 +67,17 @@ pub fn chunk_file(fpath string) ![]Chunk {
 		chunks << chunk
 	}
 
-	return chunks.clone()
+	return DfSfile{
+		filename: fpath
+		chunks: chunks
+	}
 }
 
 fn save_chunk_to_disk(parent_fpath string, cur_pos u64, buffer []u8) !Chunk {
 	// generate chunk file path
-	fhash := sha256.sum(buffer).hex()[..20]
+	md5sum := md5.sum(buffer).hex()[..20]
 	mut fname := os.base(parent_fpath)
-	fname = '${fhash}_${cur_pos}_${fname}'
+	fname = '${md5sum}_${cur_pos}_${fname}'
 	fpath := os.join_path(os.dir(parent_fpath), fname)
 
 	if os.is_file(fpath) {
@@ -92,6 +95,7 @@ fn save_chunk_to_disk(parent_fpath string, cur_pos u64, buffer []u8) !Chunk {
 	return Chunk{
 		cur_pos: cur_pos
 		fpath: fpath
-		fhash: fhash
+		md5sum: md5sum
+		bufsize: u64(buffer.len)
 	}
 }
