@@ -22,9 +22,25 @@ pub fn (mut c Chunk) load_data() ![]u8 {
 
 	fsize := os.file_size(c.fpath)
 	buffer := file.read_bytes(int(fsize))
-	println('reading chunk data from file ${os.base(c.fpath)}...')
-
+	
+	hash := md5.sum(buffer).hex()
+	println('loaded buffer from file ${c.md5sum}\t${hash}')
 	return buffer
+}
+
+pub fn (mut c Chunk) save_data(buffer []u8) !Chunk {
+	if os.is_file(c.fpath) {
+		println('file ${c.md5sum} already exists')
+	} else {
+		mut file := os.open_file(c.fpath, 'wb', 0o666)!
+		defer {
+			file.close()
+		}
+
+		file.write_to(0, buffer)!
+		println('saved data to file ${c.md5sum}')
+	}
+	return c
 }
 
 // partitions large files into small chunks,
@@ -47,14 +63,20 @@ pub fn chunk_file(fpath string) ![]Chunk {
 
 	for !file.eof() {
 		buffer := file.read_bytes_at(chunk_size, cur_pos)
-		println('chunking ${buffer.len / int(ByteSize.megabytes)} MB of data...')
+		println('chunked ${buffer.len / int(ByteSize.megabytes)} MB of data')
+
+		parent_fname := os.base(fpath)
+		hash := md5.sum(buffer).hex()
+		new_fname := '${hash}_${cur_pos}_${parent_fname}'
+		new_fpath := os.join_path(os.dir(fpath), new_fname)
 
 		mut chunk := &Chunk{
 			cur_pos: cur_pos
 			bufsize: u64(buffer.len)
-			fpath: fpath
+			fpath: new_fpath
+			md5sum: hash
 		}
-		threads << spawn save_chunk_to_disk(mut chunk, buffer)
+		threads << spawn chunk.save_data(buffer)
 		cur_pos += u64(buffer.len)
 	}
 
@@ -65,26 +87,4 @@ pub fn chunk_file(fpath string) ![]Chunk {
 	}
 
 	return chunks.clone()
-}
-
-pub fn save_chunk_to_disk(mut c Chunk, buffer []u8) !Chunk {
-	hash := md5.sum(buffer).hex()
-	mut new_fname := os.base(c.fpath)
-	new_fname = '${hash}_${c.cur_pos}_${new_fname}'
-	new_fpath := os.join_path(os.dir(c.fpath), new_fname)
-
-	c.fpath = new_fpath
-	c.md5sum = hash
-
-	if !os.is_file(c.fpath) {
-		mut file := os.open_file(c.fpath, 'wb', 0o666)!
-		defer {
-			file.close()
-		}
-
-		file.write_to(c.cur_pos, buffer)!
-		println('saving data to file ${c.fpath}...')
-	}
-
-	return c
 }
