@@ -2,6 +2,7 @@ module main
 
 import json
 import net
+import net.mbedtls
 import os
 import time
 import crypto.md5
@@ -85,19 +86,37 @@ fn upload_file(server_addr string, fpath string) ! {
 }
 
 fn main() {
+
+	// setup secure communication
+	ca_cert := utils.parse_filepath("~/certs/ca-cert.pem")
+	client_cert := os.abs_path('certs/client/client.crt')
+	client_key := os.abs_path('certs/client/client.key')
+
+	mut client := mbedtls.new_ssl_conn(mbedtls.SSLConnectConfig{
+        verify: ca_cert
+        cert: client_cert
+        cert_key: client_key
+        validate: true
+    })!
+
 	// connect to server
 	server_addr := '0.0.0.0:8080'
-	fpath := 'test_data/file.txt'
+	hostname := server_addr.all_before(":")
+	port := server_addr.all_after(":").int()
 
-	stopwatch := time.new_stopwatch()
+	println("dialing server address ${server_addr}...")
+	client.dial(hostname, port)!
 
-	upload_file(server_addr, fpath) or {
-		eprintln(err.msg())
-		exit(1)
-	}
+	// stopwatch := time.new_stopwatch()
 
-	elapsed := stopwatch.elapsed()
+	// fpath := 'test_data/file.txt'
+	// upload_file(server_addr, fpath) or {
+	// 	eprintln(err.msg())
+	// 	exit(1)
+	// }
 
-	fsize := os.file_size(fpath)
-	println('took ${elapsed.seconds()} s to upload ${fsize / u64(lib.ByteSize.gigabytes)} GB file')
+	// elapsed := stopwatch.elapsed()
+
+	// fsize := os.file_size(fpath)
+	// println('took ${elapsed.seconds()} s to upload ${fsize / u64(lib.ByteSize.gigabytes)} GB file')
 }

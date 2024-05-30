@@ -1,14 +1,16 @@
 module main
 
 import json
+import os
 import net
+import net.mbedtls
 import crypto.md5
 import lib
 import utils
 
-fn send_response(mut conn net.TcpConn, response utils.Response) ! {
+fn send_response(mut conn mbedtls.SSLConn, response utils.Response) ! {
 	data := json.encode(response).bytes()
-	conn.write(data) or { conn.close() or { return err } }
+	conn.write(data) or { conn.shutdown() or { return err } }
 
 	if !response.ack {
 		return error('denied clients ${response.request_typ} request[${response.id}]')
@@ -17,7 +19,7 @@ fn send_response(mut conn net.TcpConn, response utils.Response) ! {
 	println('accepted clients ${response.request_typ} request[${response.id}]')
 }
 
-fn read_buffer(conn net.TcpConn, buffer_size u64) ![]u8 {
+fn read_buffer(mut conn mbedtls.SSLConn, buffer_size u64) ![]u8 {
 	mut buffer := []u8{}
 	mut bytes_recv := 0
 	println('expected buffer size: ${int(buffer_size)}')
@@ -36,7 +38,7 @@ fn read_buffer(conn net.TcpConn, buffer_size u64) ![]u8 {
 	return buffer
 }
 
-fn handle_upload_request(mut conn net.TcpConn, request utils.Request) ! {
+fn handle_upload_request(mut conn mbedtls.SSLConn, request utils.Request) ! {
 	mut response := utils.Response{
 		id: request.id
 		request_typ: request.typ
@@ -56,7 +58,7 @@ fn handle_upload_request(mut conn net.TcpConn, request utils.Request) ! {
 	send_response(mut conn, response)!
 
 	// receive uploaded chunk data
-	buffer := read_buffer(conn, chunk.bufsize)!
+	buffer := read_buffer(mut conn, chunk.bufsize)!
 
 	// save chunk to disk
 	chunk.save_data(buffer) or {
@@ -64,8 +66,8 @@ fn handle_upload_request(mut conn net.TcpConn, request utils.Request) ! {
 	}
 }
 
-fn handle_client(mut conn net.TcpConn) {
-	peer_addr := conn.peer_ip() or {
+fn handle_client(mut conn mbedtls.SSLConn) {
+	peer_addr := conn.peer_addr() or {
 		eprintln(err.msg())
 		return
 	}
@@ -104,7 +106,17 @@ fn handle_client(mut conn net.TcpConn) {
 fn main() {
 	// start server
 	server_addr := '0.0.0.0:8080'
-	mut server := net.listen_tcp(net.AddrFamily.ip, server_addr)!
+	ca_cert := utils.parse_filepath("~/certs/ca-cert.pem")
+	server_cert := os.abs_path('certs/server/server.crt')
+	server_key := os.abs_path('certs/server/server.key')
+
+	mut server := mbedtls.new_ssl_listener(server_addr, mbedtls.SSLConnectConfig{
+        verify: ca_cert
+        cert: server_cert
+        cert_key: server_key
+        validate: true // mTLS
+    })!
+	// mut server := net.listen_tcp(net.AddrFamily.ip, server_addr)!
 	println('started server on address ${server_addr}')
 
 	for {
